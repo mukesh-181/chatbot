@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
+
+import { generateChatReply } from "../lib/gemini";
 import { Chat } from "../models/chat.model";
 
 const router = Router();
@@ -13,7 +15,7 @@ const addMessageSchema = z.object({
   message: z.string().trim().min(1, "message is required"),
 });
 
-const buildAssistantReply = (message: string) => `Echo: ${message}`;
+const buildChatTitle = (message: string) => message.trim().slice(0, 40) || "New Chat";
 
 router.post("/", async (req, res) => {
   const parsed = createChatSchema.safeParse(req.body);
@@ -23,20 +25,24 @@ router.post("/", async (req, res) => {
   }
 
   const { userId, message } = parsed.data;
-  const reply = buildAssistantReply(message);
 
-  const chat = new Chat({
-    userId,
-    title: message.slice(0, 30),
-    messages: [
-      { role: "user", content: message },
-      { role: "assistant", content: reply },
-    ],
-  });
+  try {
+    const reply = await generateChatReply([], message);
 
-  await chat.save();
+    const chat = await Chat.create({
+      userId,
+      title: buildChatTitle(message),
+      messages: [
+        { role: "user", content: message },
+        { role: "assistant", content: reply },
+      ],
+    });
 
-  return res.status(201).json(chat);
+    return res.status(201).json(chat);
+  } catch (error) {
+    console.error("Create chat failed:", error);
+    return res.status(500).json({ error: "Failed to generate response" });
+  }
 });
 
 router.post("/:id/messages", async (req, res) => {
@@ -53,14 +59,29 @@ router.post("/:id/messages", async (req, res) => {
   }
 
   const { message } = parsed.data;
-  const reply = buildAssistantReply(message);
 
-  chat.messages.push({ role: "user", content: message });
-  chat.messages.push({ role: "assistant", content: reply });
+  try {
+    const history = chat.messages.map((item) => ({
+      role: item.role,
+      content: item.content,
+    }));
 
-  await chat.save();
+    const reply = await generateChatReply(history, message);
 
-  return res.json(chat);
+    chat.messages.push({ role: "user", content: message });
+    chat.messages.push({ role: "assistant", content: reply });
+
+    if (!chat.title?.trim()) {
+      chat.title = buildChatTitle(message);
+    }
+
+    await chat.save();
+
+    return res.json(chat);
+  } catch (error) {
+    console.error("Add message failed:", error);
+    return res.status(500).json({ error: "Failed to generate response" });
+  }
 });
 
 router.get("/user/:userId", async (req, res) => {
@@ -86,6 +107,16 @@ router.get("/:id", async (req, res) => {
   }
 
   return res.json(chat);
+});
+
+router.delete("/:id", async (req, res) => {
+  const chat = await Chat.findByIdAndDelete(req.params.id);
+
+  if (!chat) {
+    return res.status(404).json({ error: "Chat not found" });
+  }
+
+  return res.json({ success: true });
 });
 
 export default router;
