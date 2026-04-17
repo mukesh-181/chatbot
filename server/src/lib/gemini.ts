@@ -18,7 +18,6 @@ const ai = apiKey
 
 const formatPrompt = (messages: ChatHistoryMessage[], latestMessage: string) => {
   const history = messages
-    .slice(-8)
     .map((message) => `${message.role === "assistant" ? "Assistant" : "User"}: ${message.content}`)
     .join("\n\n");
 

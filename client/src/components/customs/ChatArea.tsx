@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/react";
 import { Send } from "lucide-react";
 
@@ -10,6 +10,7 @@ import WelcomeBanner from "./WelcomeBanner";
 
 const ChatArea = () => {
   const [input, setInput] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const {
     activeChatId,
@@ -44,6 +45,12 @@ const ChatArea = () => {
 
     void loadActiveChat();
   }, [activeChatId, setActiveChatId, setLoading, setMessages]);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [messages, loading]);
 
   const handleSendMessage = async () => {
     const trimmedInput = input.trim();
@@ -89,7 +96,7 @@ const ChatArea = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-gray-900">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 pb-56">
         {messages.length === 0 ? (
           <WelcomeBanner />
         ) : (
@@ -129,7 +136,7 @@ const ChatArea = () => {
         )}
       </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-800 p-6">
+      <div className="border-t border-gray-200 dark:border-gray-800 p-6 fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900">
         <div className="max-w-4xl mx-auto">
           <div className="flex gap-4">
             <input

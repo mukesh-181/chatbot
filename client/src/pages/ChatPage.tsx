@@ -4,12 +4,12 @@ import ChatArea from "@/components/customs/ChatArea";
 
 const Chat = () => {
   return (
-    <div className="h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main Chat Container */}
-      <div className="flex-1 flex flex-col lg:ml-64">
+      <div className="flex-1 flex flex-col lg:ml-64 overflow-hidden">
         {/* Header with User Button */}
         <div className="border-b border-gray-200 dark:border-gray-800 p-4 flex justify-end">
           <UserButton />
