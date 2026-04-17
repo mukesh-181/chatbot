@@ -7,6 +7,7 @@ import { mapApiChatMessages, mapApiChatSummary } from "@/lib/chat";
 import { useChatStore } from "@/store/useChatStore";
 import { Button } from "@/components/ui/button";
 import WelcomeBanner from "./WelcomeBanner";
+import ReactMarkdown from "react-markdown";
 
 const ChatArea = () => {
   const [input, setInput] = useState("");
@@ -48,7 +49,8 @@ const ChatArea = () => {
 
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      scrollContainerRef.current.scrollTop =
+        scrollContainerRef.current.scrollHeight;
     }
   }, [messages, loading]);
 
@@ -87,7 +89,8 @@ const ChatArea = () => {
       addMessage({
         id: `temp-assistant-${Date.now()}`,
         role: "assistant",
-        content: "Sorry, I could not get a response right now. Please try again after sometime.",
+        content:
+          "Sorry, I could not get a response right now. Please try again after sometime.",
       });
     } finally {
       setLoading(false);
@@ -96,7 +99,10 @@ const ChatArea = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-gray-900">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 pb-56">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-6 pb-56"
+      >
         {messages.length === 0 ? (
           <WelcomeBanner />
         ) : (
@@ -116,7 +122,7 @@ const ChatArea = () => {
                   }`}
                 >
                   <div className="whitespace-pre-wrap wrap-break-words leading-7">
-                    {message.content}
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
                   </div>
                 </div>
               </div>
