@@ -46,8 +46,6 @@ const Sidebar = () => {
     }
   };
 
-  const activeChat = chats.find((chat) => chat.id === activeChatId);
-
   return (
     <>
       {/* Toggle Button */}
