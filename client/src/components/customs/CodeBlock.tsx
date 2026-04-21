@@ -23,15 +23,19 @@ const CodeBlock = ({ language, children }: CodeBlockProps) => {
   };
 
   return (
-    <div className="relative rounded-lg overflow-hidden my-2 sm:my-4 bg-gray-900 border border-gray-700 w-full">
+    <div className="relative rounded-2xl overflow-hidden my-2 sm:my-4 bg-linear-to-b from-gray-950 to-gray-900 border border-gray-700 w-full shadow-xl hover:shadow-2xl transition-shadow duration-300">
       {/* Language label and copy button */}
-      <div className="flex items-center justify-between bg-gray-800 px-2 sm:px-4 py-1.5 sm:py-2 border-b border-gray-700 gap-2">
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
+      <div className="flex items-center justify-between bg-linear-to-r from-gray-900 to-gray-800 px-2 sm:px-4 py-2 sm:py-2.5 border-b border-gray-700 gap-2">
+        <span className="text-xs font-bold text-blue-400 uppercase tracking-wider truncate">
           {language || "code"}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors shrink-0"
+          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 shrink-0 ${
+            copied
+              ? "bg-green-600 text-white"
+              : "bg-gray-700 text-gray-200 hover:bg-blue-600 hover:text-white"
+          }`}
           title={copied ? "Copied!" : "Copy code"}
         >
           {copied ? (
@@ -55,14 +59,16 @@ const CodeBlock = ({ language, children }: CodeBlockProps) => {
           style={atomDark}
           customStyle={{
             margin: 0,
-            padding: "0.75rem",
-            fontSize: "0.75rem",
-            lineHeight: "1.4",
+            padding: "1rem",
+            fontSize: "0.813rem",
+            lineHeight: "1.5",
+            backgroundColor: "transparent",
           }}
           showLineNumbers={code.split("\n").length > 5}
           lineNumberStyle={{
-            color: "#6b7280",
-            paddingRight: "0.5rem",
+            color: "#4b5563",
+            paddingRight: "1rem",
+            minWidth: "2rem",
           }}
           wrapLines={true}
         >
