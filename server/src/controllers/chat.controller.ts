@@ -72,7 +72,7 @@ export const updatePrevChat = async (req: any, res: any) => {
       content: item.content,
     })).slice(-8);
 
-    console.log("Chat history for reply generation:", history);
+    // console.log("Chat history for reply generation:", history);
 
     const reply = await generateChatReply(history, message);
 

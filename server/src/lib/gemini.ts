@@ -22,9 +22,7 @@ const formatPrompt = (messages: ChatHistoryMessage[], latestMessage: string) => 
     .join("\n\n");
 
   return [
-    "You are a simple helpful chatbot.",
-    "Keep answers short, clear, and friendly.",
-    "Use simple text formatting with short paragraphs or bullet points when helpful.",
+    "Use markdown. Wrap code in triple backticks with language (e.g. ```js).",
     history ? `Conversation so far:\n${history}` : "",
     `User: ${latestMessage}`,
     "Assistant:",
@@ -49,7 +47,7 @@ export const generateChatReply = async (
   }
 
   const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemma-3-12b-it",
     contents: formatPrompt(messages, latestMessage),
   });
 
