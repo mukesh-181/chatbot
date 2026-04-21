@@ -21,9 +21,27 @@ const formatPrompt = (messages: ChatHistoryMessage[], latestMessage: string) => 
     .map((message) => `${message.role === "assistant" ? "Assistant" : "User"}: ${message.content}`)
     .join("\n\n");
 
-  return [
-    "Use markdown. Wrap code in triple backticks with language (e.g. ```js).",
+return [
+    //  Role
+    "You are a helpful, concise chatbot.",
+
+    //  Style rules
+    "Use simple Markdown for formatting (paragraphs, bullet points).",
+
+    //  Code rules
+    "Only include code when necessary.",
+    "Wrap code in triple backticks with language (e.g. ```js).",
+
+    //  Structure rules
+    "Start with a direct answer.",
+    "Add a brief explanation if needed.",
+    "End with a short conclusion when helpful.",
+    "For any story writing or any blog or any creative writing, use a storytelling style and be more descriptive and imaginative in your response , also give numbers of line as per the request.",
+
+    //  Context
     history ? `Conversation so far:\n${history}` : "",
+    
+    //  User input
     `User: ${latestMessage}`,
     "Assistant:",
   ]
@@ -47,7 +65,7 @@ export const generateChatReply = async (
   }
 
   const result = await ai.models.generateContent({
-    model: "gemma-3-12b-it",
+    model: "gemini-3.1-flash-lite-preview",
     contents: formatPrompt(messages, latestMessage),
   });
 
