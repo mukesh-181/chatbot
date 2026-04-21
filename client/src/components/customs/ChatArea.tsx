@@ -57,12 +57,22 @@ const ChatArea = () => {
   }, [messages, loading]);
 
   // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-    }
-  }, [input]);
+ useEffect(() => {
+  const el = textareaRef.current;
+  if (!el) return;
+
+  el.style.height = "auto";
+
+  const newHeight = Math.min(el.scrollHeight, 200);
+  el.style.height = `${newHeight}px`;
+
+  // 👇 KEY FIX
+  if (el.scrollHeight > 200) {
+    el.style.overflowY = "auto";
+  } else {
+    el.style.overflowY = "hidden";
+  }
+}, [input]);
 
   const handleSendMessage = async () => {
     const trimmedInput = input.trim();
@@ -192,7 +202,7 @@ const ChatArea = () => {
               }}
               disabled={loading}
               rows={1}
-              className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 disabled:opacity-50 transition-all duration-200 text-sm sm:text-base shadow-sm resize-none overflow-hidden max-h-52 min-h-10"
+              className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 disabled:opacity-50 transition-all duration-200 text-sm sm:text-base shadow-sm resize-none overflow-y-auto max-h-52 min-h-10"
             />
             <Button
               onClick={() => void handleSendMessage()}
