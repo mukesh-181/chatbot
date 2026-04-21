@@ -112,7 +112,7 @@ const ChatArea = () => {
   };
 
   const markdownComponents: Components = {
-    code({ className, children, ...props }) {
+    code({ className, children, }) {
       const match = /language-(\w+)/.exec(className || "");
 
       // ✅ Code block
