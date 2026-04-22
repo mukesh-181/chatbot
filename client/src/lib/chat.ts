@@ -1,4 +1,5 @@
 import type { ChatSummary, Message } from "@/store/useChatStore";
+import type { AIModelId, AIProvider } from "./aiModels";
 
 type ApiMessage = {
   _id?: string;
@@ -10,8 +11,12 @@ type ApiChat = {
   _id: string;
   title: string;
   updatedAt: string;
+  provider?: AIProvider;
+  modelId?: AIModelId;
   messages: ApiMessage[];
 };
+
+export type ApiChatDetails = ApiChat;
 
 export const mapApiMessage = (message: ApiMessage, index: number): Message => ({
   id: message._id || `${message.role}-${index}`,

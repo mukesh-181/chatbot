@@ -1,5 +1,6 @@
 import { addMessageSchema, buildChatTitle, createChatSchema } from "../utils/zodValidation";
-import { generateChatReply } from "../lib/gemini";
+import { getAvailableAIModels, resolveAISelection } from "../lib/ai/constants";
+import { generateChatReply } from "../lib/ai/services/chat-completion.service";
 import { Chat } from "../models/chat.model";
 import { formatError } from "zod";
 
@@ -15,13 +16,21 @@ export const createNewChat = async (req: any, res: any) => {
   }
 
   const { userId, message } = parsed.data;
+  const { provider, model } = resolveAISelection(parsed.data);
 
   try {
-    const reply = await generateChatReply([], message);
+    const reply = await generateChatReply({
+      history: [],
+      latestMessage: message,
+      provider,
+      model,
+    });
 
     const chat = await Chat.create({
       userId,
       title: buildChatTitle(message),
+      provider,
+      modelId: model,
       messages: [
         { role: "user", content: message },
         { role: "assistant", content: reply },
@@ -65,6 +74,10 @@ export const updatePrevChat = async (req: any, res: any) => {
   }
 
   const { message } = parsed.data;
+  const { provider, model } = resolveAISelection({
+    provider: parsed.data.provider || chat.provider,
+    model: parsed.data.model || chat.modelId,
+  });
 
   try {
     const history = chat.messages.map((item) => ({
@@ -72,12 +85,17 @@ export const updatePrevChat = async (req: any, res: any) => {
       content: item.content,
     })).slice(-8);
 
-    // console.log("Chat history for reply generation:", history);
-
-    const reply = await generateChatReply(history, message);
+    const reply = await generateChatReply({
+      history,
+      latestMessage: message,
+      provider,
+      model,
+    });
 
     chat.messages.push({ role: "user", content: message });
     chat.messages.push({ role: "assistant", content: reply });
+    chat.provider = provider;
+    chat.modelId = model;
 
     if (!chat.title?.trim()) {
       chat.title = buildChatTitle(message);
@@ -125,3 +143,10 @@ export const deleteChat = async (req: any, res: any) => {
 };
 
 
+
+export const getAvailableModels = async (_req: any, res: any) => {
+  return res.json({
+    defaultModel: getAvailableAIModels()[0]?.id || null,
+    models: getAvailableAIModels(),
+  });
+};

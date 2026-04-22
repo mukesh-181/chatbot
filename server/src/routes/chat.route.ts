@@ -2,13 +2,15 @@ import { Router } from "express";
 
 
 
-import { createNewChat, deleteChat, getIndividualChatDetails, getUserChats, updatePrevChat } from "../controllers/chat.controller";
+import { createNewChat, deleteChat, getAvailableModels, getIndividualChatDetails, getUserChats, updatePrevChat } from "../controllers/chat.controller";
 
 const router = Router();
 
 
 
 router.post("/", createNewChat);
+
+router.get("/models", getAvailableModels);
 
 router.post("/:id/messages", updatePrevChat);
 

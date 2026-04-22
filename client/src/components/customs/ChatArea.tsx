@@ -3,18 +3,33 @@ import { useUser } from "@clerk/react";
 import { Send } from "lucide-react";
 
 import { api } from "@/lib/api";
-import { mapApiChatMessages, mapApiChatSummary } from "@/lib/chat";
+import {
+  mapApiChatMessages,
+  mapApiChatSummary,
+  type ApiChatDetails,
+} from "@/lib/chat";
+import type {
+  AIModelId,
+  AIModelOption,
+  AvailableModelsResponse,
+} from "@/lib/aiModels";
 import { useChatStore } from "@/store/useChatStore";
 import { Button } from "@/components/ui/button";
 import WelcomeBanner from "./WelcomeBanner";
-import CodeBlock from "./CodeBlock";
-import ReactMarkdown, { type Components } from "react-markdown";
+
+import { markdownComponents } from "./markdownComponents";
+import HistoryCard from "./HistoryCard";
 
 const ChatArea = () => {
   const [input, setInput] = useState("");
+  const [availableModels, setAvailableModels] = useState<AIModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState<AIModelId>("");
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const { user } = useUser();
+
   const {
     activeChatId,
     loading,
@@ -26,6 +41,56 @@ const ChatArea = () => {
     upsertChat,
   } = useChatStore();
 
+  const selectedModelOption = availableModels.find(
+    (model) => model.id === selectedModel,
+  );
+
+  const fallbackModelId = availableModels[0]?.id || "";
+
+  // 🔹 Load models
+  useEffect(() => {
+    const loadAvailableModels = async () => {
+      try {
+        const res = await api.get("/chat/models");
+        const data = res.data as AvailableModelsResponse;
+
+        setAvailableModels(data.models);
+
+        setSelectedModel((currentModel) => {
+          if (
+            currentModel &&
+            data.models.some((model) => model.id === currentModel)
+          ) {
+            return currentModel;
+          }
+
+          if (
+            data.defaultModel &&
+            data.models.some((model) => model.id === data.defaultModel)
+          ) {
+            return data.defaultModel;
+          }
+
+          return data.models[0]?.id || "";
+        });
+      } catch {
+        setAvailableModels([]);
+      }
+    };
+
+    void loadAvailableModels();
+  }, []);
+
+  // 🔹 Ensure valid model
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+
+    if (!selectedModelOption) {
+      setSelectedModel(fallbackModelId);
+    }
+  }, [availableModels, fallbackModelId, selectedModelOption]);
+
+  // 🔹 Load active chat
   useEffect(() => {
     const loadActiveChat = async () => {
       if (!activeChatId) {
@@ -37,7 +102,18 @@ const ChatArea = () => {
 
       try {
         const res = await api.get(`/chat/${activeChatId}`);
-        setMessages(mapApiChatMessages(res.data));
+        const chat = res.data as ApiChatDetails;
+
+        setMessages(mapApiChatMessages(chat));
+
+        if (
+          chat.modelId &&
+          availableModels.some((model) => model.id === chat.modelId)
+        ) {
+          setSelectedModel(chat.modelId);
+        } else if (!chat.modelId && fallbackModelId) {
+          setSelectedModel(fallbackModelId);
+        }
       } catch {
         setMessages([]);
         setActiveChatId(null);
@@ -47,8 +123,16 @@ const ChatArea = () => {
     };
 
     void loadActiveChat();
-  }, [activeChatId, setActiveChatId, setLoading, setMessages]);
+  }, [
+    activeChatId,
+    availableModels,
+    fallbackModelId,
+    setActiveChatId,
+    setLoading,
+    setMessages,
+  ]);
 
+  // 🔹 Auto scroll
   useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop =
@@ -56,30 +140,26 @@ const ChatArea = () => {
     }
   }, [messages, loading]);
 
-  // Auto-resize textarea
- useEffect(() => {
-  const el = textareaRef.current;
-  if (!el) return;
+  // 🔹 Auto resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
 
-  el.style.height = "auto";
+    el.style.height = "auto";
 
-  const newHeight = Math.min(el.scrollHeight, 200);
-  el.style.height = `${newHeight}px`;
+    const newHeight = Math.min(el.scrollHeight, 200);
+    el.style.height = `${newHeight}px`;
 
-  // 👇 KEY FIX
-  if (el.scrollHeight > 200) {
-    el.style.overflowY = "auto";
-  } else {
-    el.style.overflowY = "hidden";
-  }
-}, [input]);
+    el.style.overflowY = el.scrollHeight > 200 ? "auto" : "hidden";
+  }, [input]);
 
+  // 🔹 Send message
   const handleSendMessage = async () => {
     const trimmedInput = input.trim();
 
-    if (!trimmedInput || !user?.id || loading) {
-      return;
-    }
+    if (!trimmedInput || !user?.id || loading) return;
+
+    if (!selectedModelOption) return;
 
     const optimisticUserMessage = {
       id: `temp-user-${Date.now()}`,
@@ -88,10 +168,8 @@ const ChatArea = () => {
     };
 
     setInput("");
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
     addMessage(optimisticUserMessage);
     setLoading(true);
 
@@ -99,16 +177,25 @@ const ChatArea = () => {
       const res = activeChatId
         ? await api.post(`/chat/${activeChatId}/messages`, {
             message: trimmedInput,
+            provider: selectedModelOption.provider,
+            model: selectedModelOption.id,
           })
         : await api.post("/chat", {
             userId: user.id,
             message: trimmedInput,
+            provider: selectedModelOption.provider,
+            model: selectedModelOption.id,
           });
 
-      const chat = res.data;
+      const chat = res.data as ApiChatDetails;
+
       setActiveChatId(chat._id);
       setMessages(mapApiChatMessages(chat));
       upsertChat(mapApiChatSummary(chat));
+
+      if (chat.modelId) {
+        setSelectedModel(chat.modelId);
+      }
     } catch {
       addMessage({
         id: `temp-assistant-${Date.now()}`,
@@ -121,26 +208,9 @@ const ChatArea = () => {
     }
   };
 
-  const markdownComponents: Components = {
-    code({ className, children, }) {
-      const match = /language-(\w+)/.exec(className || "");
-
-      // ✅ Code block
-      if (match) {
-        return <CodeBlock language={match[1]} children={String(children)} />;
-      }
-
-      // ✅ Inline code
-      return (
-        <code className="bg-white/20 dark:bg-black/30 text-gray-900 dark:text-gray-100 px-2 py-1 rounded font-mono text-sm border border-gray-300 dark:border-gray-600">
-          {children}
-        </code>
-      );
-    },
-  };
-
   return (
     <div className="flex flex-col h-full w-full bg-linear-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
+      {/* 🔹 Chat Messages Area */}
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-3 sm:p-6 pb-40 sm:pb-56"
@@ -148,58 +218,59 @@ const ChatArea = () => {
         {messages.length === 0 ? (
           <WelcomeBanner />
         ) : (
-          <div className="w-full max-w-full sm:max-w-4xl mx-auto space-y-3 sm:space-y-5">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                } animate-in fade-in slide-in-from-bottom-2 duration-300`}
-              >
-                <div
-                  className={`p-3 sm:p-4 rounded-2xl w-full sm:w-auto max-w-xs sm:max-w-2xl wrap-break-words transition-all duration-200 ${
-                    message.role === "user"
-                      ? "bg-blue-100 dark:bg-blue-950 text-gray-900 dark:text-white border border-blue-300 dark:border-blue-800 shadow-md hover:shadow-lg"
-                      : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-md hover:shadow-lg border border-gray-200 dark:border-gray-700"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap wrap-break-words leading-6 sm:leading-7 text-sm sm:text-base">
-                    <ReactMarkdown components={markdownComponents}>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700">
-                  <div className="flex gap-2">
-                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce" />
-                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce [animation-delay:200ms]" />
-                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce [animation-delay:400ms]" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <HistoryCard
+            messages={messages}
+            loading={loading}
+            markdownComponents={markdownComponents}
+          />
         )}
       </div>
 
-      <div className="
-  border-t border-gray-200 dark:border-gray-800 
-  p-3 sm:p-6 
-  fixed bottom-0 
-  left-0 lg:left-64 
-  w-full lg:w-[calc(100%-16rem)]
-  bg-white dark:bg-gray-900 
-  z-10 shadow-2xl backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95
-">  <div className="w-full max-w-full sm:max-w-4xl mx-auto">
+      {/* 🔹 Input Area */}
+      <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-6 fixed bottom-0 left-0 lg:left-64 w-full lg:w-[calc(100%-16rem)] bg-white dark:bg-gray-900 z-10 shadow-2xl backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
+        <div className="w-full max-w-full sm:max-w-4xl mx-auto">
+          {/* Model Select */}
+          <div className="mb-4 flex justify-end">
+            <div className="relative">
+              {/* Label (optional but improves UX) */}
+              <span className="absolute -top-2 left-3 px-1 text-xs bg-white dark:bg-gray-900 text-gray-500">
+                Model
+              </span>
+
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={loading || availableModels.length === 0}
+                className="appearance-none bg-white dark:bg-gray-900 
+      border border-gray-300 dark:border-gray-700
+      text-sm font-medium text-gray-900 dark:text-white
+      rounded-full px-4 py-2 pr-10
+      shadow-sm
+      focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white
+      hover:border-gray-400 dark:hover:border-gray-500
+      transition-all duration-200
+      disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+
+              {/* Custom Dropdown Arrow */}
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
+                ▼
+              </div>
+            </div>
+          </div>
+
+          {/* Input */}
           <div className="flex gap-2 sm:gap-3 items-center">
             <textarea
               ref={textareaRef}
-              placeholder="Ask me anything..."
               value={input}
+              placeholder="Ask me anything..."
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -209,15 +280,14 @@ const ChatArea = () => {
               }}
               disabled={loading}
               rows={1}
-              className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 disabled:opacity-50 transition-all duration-200 text-sm sm:text-base shadow-sm resize-none overflow-y-auto max-h-52 min-h-10"
+              className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
             />
+
             <Button
               onClick={() => void handleSendMessage()}
               disabled={!input.trim() || loading}
-              className="bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-700 dark:hover:to-blue-800 text-white px-3 sm:px-6 py-2.5 sm:py-3 flex items-center gap-1 sm:gap-2 shrink-0 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
             >
-              <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Send</span>
+              <Send className="w-4 h-4" />
             </Button>
           </div>
         </div>

@@ -16,6 +16,8 @@ const messageSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const supportedProviders = ["gemini", "openai"] as const;
+
 const chatSchema = new mongoose.Schema(
   {
     userId: {
@@ -27,6 +29,17 @@ const chatSchema = new mongoose.Schema(
     title: {
       type: String,
       default: "New Chat",
+      trim: true,
+    },
+    provider: {
+      type: String,
+      enum: supportedProviders,
+      default: "gemini",
+      trim: true,
+    },
+    modelId: {
+      type: String,
+      default: "gemini-2.5-flash-lite",
       trim: true,
     },
     messages: {
