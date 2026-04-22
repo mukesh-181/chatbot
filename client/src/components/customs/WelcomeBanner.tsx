@@ -11,7 +11,7 @@ const WelcomeBanner = () => {
       {/* Welcome Text */}
       <div className="text-center">
         <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-          Welcome to ChatBot
+          Welcome to RoboChat!
         </h2>
         <p className="text-gray-600 dark:text-gray-400 text-lg">
           Start a new conversation or continue your previous chat

@@ -62,7 +62,7 @@ The application is built as a **monorepo** with separate frontend and backend, w
 
 ### 1. **Application Structure**
 
-```
+```text
 src/
 ├── pages/
 │   ├── ChatPage.tsx          # Main chat interface
@@ -84,7 +84,7 @@ src/
 ### 2. **User Journey (Frontend)**
 
 #### Step 1: User Authentication
-```
+```text
 User opens app
     ↓
 Clerk Authentication check
@@ -102,7 +102,7 @@ If not → Show LoginPage
 ```
 
 #### Step 3: Sidebar - View Chat History
-```
+```text
 Sidebar Component:
 1. On mount → Fetch all chats for logged-in user
 2. Display list of previous conversations
@@ -123,7 +123,7 @@ useEffect(() => {
 ```
 
 #### Step 4: ChatArea - Send Message
-```
+```text
 User types message
     ↓
 Clicks Send button or presses Enter
@@ -153,7 +153,7 @@ SCENARIO C: Load Previous Chat
 ```
 
 #### Step 5: Message Display
-```
+```text
 Messages array from store:
 [
   { role: "user", content: "Hello" },
@@ -175,7 +175,7 @@ Rendered as:
   chats: ChatSummary[],               // List of all chats (id, title, updatedAt)
   messages: Message[],                // Messages in active chat
   loading: boolean,                   // Loading state for API calls
-  
+
   // Actions:
   setActiveChatId(chatId)             // Switch to different chat
   setChats(chats)                     // Update chat list
@@ -225,7 +225,7 @@ Rendered as:
 
 #### Endpoint: POST /api/chat (Create New Chat)
 
-```
+```text
 Request arrives:
 {
   userId: "user123",
@@ -262,7 +262,7 @@ Return 201 + chat object to frontend
 
 #### Endpoint: POST /api/chat/:id/messages (Add Message)
 
-```
+```text
 Request arrives with chatId and message:
 {
   message: "Tell me more about functions"
@@ -295,7 +295,7 @@ Return 200 + updated chat object
 
 #### Endpoint: GET /api/chat/user/:userId (Get Chat List)
 
-```
+```text
 Request arrives with userId
     ↓
 Find all chats where userId matches
@@ -360,11 +360,11 @@ Process:
    ```
    You are a simple helpful chatbot.
    Keep answers short, clear, and friendly.
-   
+
    Conversation so far:
    User: Hello
    Assistant: Hi!
-   
+
    User: How are you?
    ```
 
@@ -422,7 +422,7 @@ type Message = {
 
 ### Example: User sends "Hello" in new chat
 
-```
+```text
 STEP 1: FRONTEND
 ┌─────────────────────────────────┐
 │ User types "Hello" and clicks   │
@@ -551,7 +551,7 @@ STEP 3: FRONTEND (Response)
 
 ## 📁 File Structure Reference
 
-```
+```text
 chatbot/
 ├── client/                              # Frontend (React)
 │   ├── src/
@@ -678,3 +678,403 @@ This application demonstrates a complete full-stack chatbot with:
 The flow is: **User Input → Frontend → Backend Validation → Gemini AI → Response → Save to DB → Display in UI**
 
 Each component works together to create a seamless ChatGPT-like experience! 🎉
+
+---
+
+## 🔄 README Update Based On Current Codebase
+
+This section keeps the original documentation above, but adds **code-verified updates** from the current implementation so the README matches what is actually in the repo today.
+
+### 1. Current Product Name
+
+The UI currently uses the name **RoboChat**.
+
+Examples from the codebase:
+
+```html
+<!-- client/index.html -->
+<title>RoboChat</title>
+```
+
+```tsx
+// client/src/pages/ChatPage.tsx
+<span>RoboChat</span>
+```
+
+### 2. Actual Frontend Routing Flow
+
+The client uses `react-router-dom` with only two routes:
+
+```tsx
+// client/src/App.tsx
+<Routes>
+  <Route path="/login" element={<LoginPage />} />
+  <Route
+    path="/"
+    element={
+      <ProtectedRoute>
+        <ChatPage />
+      </ProtectedRoute>
+    }
+  />
+</Routes>
+```
+
+This means:
+- `/login` renders the Clerk sign-in page
+- `/` is protected and only available for signed-in users
+- unauthenticated users are redirected to `/login`
+
+### 3. Clerk Integration
+
+Clerk is initialized at the app entry with the publishable key from Vite env:
+
+```tsx
+// client/src/main.tsx
+<ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
+  <App />
+</ClerkProvider>
+```
+
+If `VITE_CLERK_PUBLISHABLE_KEY` is missing, authentication will not initialize correctly on the client.
+
+### 4. Real Chat Rendering With Markdown And Code Blocks
+
+One of the biggest updates in the current codebase is that assistant messages are rendered with Markdown support:
+
+```tsx
+// client/src/components/customs/ChatArea.tsx
+<ReactMarkdown components={markdownComponents}>
+  {message.content}
+</ReactMarkdown>
+```
+
+The app also supports:
+- fenced code blocks with syntax highlighting
+- inline code styling
+- copy-to-clipboard for code snippets
+- optional line numbers for longer code blocks
+
+Example from the custom code renderer:
+
+```tsx
+// client/src/components/customs/CodeBlock.tsx
+<SyntaxHighlighter
+  language={language}
+  style={atomDark}
+  showLineNumbers={code.split("\n").length > 5}
+>
+  {code}
+</SyntaxHighlighter>
+```
+
+So the app is no longer just plain text chat UI. It is designed to display developer-friendly responses properly, especially code answers from Gemini.
+
+### 5. How Chat Loading Works In The Current UI
+
+The current `ChatArea` behavior is:
+
+```text
+No active chat selected
+    ↓
+Show WelcomeBanner
+    ↓
+User sends first message
+    ↓
+Optimistic user message is added immediately
+    ↓
+Backend returns saved chat
+    ↓
+Store is updated with:
+- activeChatId
+- full mapped messages
+- sidebar summary
+```
+
+Important implementation details:
+- the input uses an auto-resizing textarea
+- pressing `Enter` sends the message
+- `Shift + Enter` keeps a newline
+- the app scrolls to the latest message automatically
+
+### 6. Sidebar Behavior In The Current Code
+
+The sidebar does more than just list chats. It currently supports:
+- mobile open/close toggle
+- collapsible "Chat History" dropdown
+- deleting a chat
+- clearing current chat state when starting a new chat
+
+The delete flow is implemented like this:
+
+```tsx
+// client/src/components/customs/Sidebar.tsx
+await api.delete(`/chat/${chatId}`);
+removeChat(chatId);
+
+if (activeChatId === chatId) {
+  clearChat();
+}
+```
+
+That means deleting the active conversation also resets the visible message panel.
+
+### 7. Actual API Base URL Used By The Client
+
+The client creates a shared Axios instance:
+
+```ts
+// client/src/lib/api.ts
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+});
+```
+
+So:
+- if `VITE_API_URL` is set, the client uses that
+- otherwise it defaults to `http://localhost:5000/api`
+
+### 8. Actual Store Shape Used By Zustand
+
+The current Zustand store contains:
+
+```ts
+type ChatState = {
+  activeChatId: string | null;
+  chats: ChatSummary[];
+  messages: Message[];
+  loading: boolean;
+  setActiveChatId: (chatId: string | null) => void;
+  setChats: (chats: ChatSummary[]) => void;
+  upsertChat: (chat: ChatSummary) => void;
+  removeChat: (chatId: string) => void;
+  setMessages: (messages: Message[]) => void;
+  addMessage: (message: Message) => void;
+  setLoading: (loading: boolean) => void;
+  clearChat: () => void;
+};
+```
+
+A useful detail here is `upsertChat`, which removes an old summary with the same ID and puts the latest version at the top of the sidebar list. That keeps recently updated chats first.
+
+### 9. Current Backend Validation Logic
+
+The previous README describes validation conceptually, but the current Zod schemas are a little different from that explanation:
+
+```ts
+// server/src/utils/zodValidation.ts
+export const createChatSchema = z.object({
+  userId: z.string().trim().min(1, "userId is required"),
+  message: z.string().trim().optional().default(""),
+});
+
+export const addMessageSchema = z.object({
+  message: z.string().trim().optional().default(""),
+});
+```
+
+Important note:
+- `userId` is required for new chats
+- `message` is currently optional in the schema and defaults to an empty string
+
+That means the README's older wording saying message content is strictly validated as non-empty is **not fully accurate for the current code**. The UI prevents empty sends on the frontend, but the backend schema itself currently allows an empty string.
+
+### 10. Current Chat Title Logic
+
+The chat title is generated from the first message using:
+
+```ts
+// server/src/utils/zodValidation.ts
+export const buildChatTitle = (message: string) =>
+  message.trim().slice(0, 40) || "New Chat";
+```
+
+So the title behavior is:
+- trim whitespace
+- take the first 40 characters
+- fallback to `"New Chat"` if the message is blank
+
+### 11. Current Gemini Prompting Logic
+
+The current Gemini integration does a bit more than the earlier README described.
+
+It:
+- initializes `GoogleGenAI` only if `GEMINI_API_KEY` exists
+- formats previous messages into a plain text conversation transcript
+- adds response style instructions
+- asks for Markdown formatting when helpful
+- normalizes the final generated text before returning it
+
+The response is generated with:
+
+```ts
+// server/src/lib/gemini.ts
+const result = await ai.models.generateContent({
+  model: "gemini-3.1-flash-lite-preview",
+  contents: formatPrompt(messages, latestMessage),
+});
+```
+
+Additional implementation detail:
+- only the last 8 saved messages are used when continuing a chat
+- this slicing happens in the controller before calling Gemini
+
+```ts
+const history = chat.messages
+  .map((item) => ({
+    role: item.role,
+    content: item.content,
+  }))
+  .slice(-8);
+```
+
+### 12. Actual Chat Schema In MongoDB
+
+The current model is:
+
+```ts
+// server/src/models/chat.model.ts
+const chatSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: String,
+      required: true,
+      index: true,
+      trim: true,
+    },
+    title: {
+      type: String,
+      default: "New Chat",
+      trim: true,
+    },
+    messages: {
+      type: [messageSchema],
+      default: [],
+    },
+  },
+  { timestamps: true }
+);
+```
+
+This confirms:
+- `userId` is indexed
+- `messages` is an embedded subdocument array
+- Mongoose timestamps automatically provide `createdAt` and `updatedAt`
+
+### 13. Current Server Scripts
+
+The server currently exposes only one useful npm script:
+
+```json
+{
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node-dev src/server.ts"
+  }
+}
+```
+
+So at the moment:
+- `npm run dev` works for the backend
+- there is no real backend test script yet
+- there is no separate backend build script yet
+
+### 14. Current Client Scripts
+
+The client supports:
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  }
+}
+```
+
+These are the commands you can use:
+
+```bash
+cd client
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
+
+### 15. Updated Environment Variable Reference
+
+Use these env files for the current repo:
+
+#### `server/.env`
+
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+#### `client/.env.local` or `client/.env`
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+```
+
+### 16. Updated File Structure With Important UI Files
+
+The original file structure section is still useful, but the current codebase also includes these notable files:
+
+```text
+client/src/components/customs/
+├── ChatArea.tsx         # Chat rendering, input, optimistic updates
+├── CodeBlock.tsx        # Syntax highlighting + copy button
+├── ProtectedRoute.tsx   # Auth guard
+├── Sidebar.tsx          # Chat history, delete, mobile toggle
+└── WelcomeBanner.tsx    # Empty-state welcome UI
+```
+
+### 17. Practical End-To-End Run Instructions
+
+If you want the shortest setup path for the current repo, use:
+
+```bash
+# terminal 1
+cd server
+npm install
+npm run dev
+```
+
+```bash
+# terminal 2
+cd client
+npm install
+npm run dev
+```
+
+Then open the client URL shown by Vite, usually:
+
+```text
+http://localhost:5173
+```
+
+The backend default remains:
+
+```text
+http://localhost:5000
+```
+
+### 18. Updated Summary Of What The App Does Today
+
+Based on the current code, this project now provides:
+- authenticated chat with Clerk
+- persistent conversation storage in MongoDB
+- Gemini-generated answers through an Express API
+- Markdown rendering in assistant messages
+- syntax-highlighted code blocks with copy support
+- chat history loading and deletion
+- responsive sidebar behavior for smaller screens
+
+That makes the current app closer to a developer-friendly AI chat assistant than a simple plain-text chatbot.

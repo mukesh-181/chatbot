@@ -66,7 +66,7 @@ const Sidebar = () => {
         <div className="p-4 border-b border-gray-200 dark:border-gray-800 mt-16 lg:mt-0">
           <Button
             onClick={handleNewChat}
-            className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg font-medium"
+            className="w-full cursor-pointer flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg font-medium"
           >
             <Plus className="w-5 h-5" />
             New Chat
@@ -125,7 +125,7 @@ const Sidebar = () => {
                           event.stopPropagation();
                           void handleDeleteChat(chat.id);
                         }}
-                        className="rounded p-1.5 text-gray-400 opacity-0 transition hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 group-hover:opacity-100 disabled:opacity-100 shrink-0"
+                        className="rounded p-1.5 cursor-pointer text-gray-400 opacity-0 transition hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 group-hover:opacity-100 disabled:opacity-100 shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
