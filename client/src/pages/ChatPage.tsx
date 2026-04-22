@@ -17,7 +17,7 @@ const Chat = () => {
         <div className="border-b border-gray-200 dark:border-gray-800 p-4 flex justify-between items-center">
           
           {/* Left Side: Logo + Name */}
-          <div className="flex items-center gap-2 font-semibold text-lg">
+          <div className="flex  ml-10 items-center gap-2 font-semibold text-lg">
              <span>RoboChat</span>
             <span className="text-gray-400">|</span>
             <span className="text-sm text-gray-600 dark:text-gray-300">

@@ -51,7 +51,7 @@ const Sidebar = () => {
       {/* Toggle Button */}
       <button
         onClick={() => setIsSidebarOpen((open) => !open)}
-        className="fixed top-4 left-4 z-50 p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 lg:hidden"
+        className="fixed top-2.5 left-2 z-50 p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 lg:hidden"
       >
         {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>

@@ -186,8 +186,15 @@ const ChatArea = () => {
         )}
       </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-6 fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 z-10 shadow-2xl backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
-        <div className="w-full max-w-full sm:max-w-4xl mx-auto">
+      <div className="
+  border-t border-gray-200 dark:border-gray-800 
+  p-3 sm:p-6 
+  fixed bottom-0 
+  left-0 lg:left-64 
+  w-full lg:w-[calc(100%-16rem)]
+  bg-white dark:bg-gray-900 
+  z-10 shadow-2xl backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95
+">  <div className="w-full max-w-full sm:max-w-4xl mx-auto">
           <div className="flex gap-2 sm:gap-3 items-center">
             <textarea
               ref={textareaRef}
