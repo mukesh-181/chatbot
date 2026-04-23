@@ -1,7 +1,7 @@
 
 import ReactMarkdown from "react-markdown";
 
-type HistoryCardProps = {
+type DisplayComponentProps = {
   messages: {
     id: string;
     role: "user" | "assistant";
@@ -17,7 +17,7 @@ const HistoryCard = ({
   loading,
   streamingMessageId,
   markdownComponents,
-}: HistoryCardProps) => {
+}: DisplayComponentProps) => {
   return (
     <>
       <div className="w-full max-w-full sm:max-w-4xl mx-auto space-y-3 sm:space-y-5">

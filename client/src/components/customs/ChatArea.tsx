@@ -1,38 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/react";
-import { Send } from "lucide-react";
 
 import { api } from "@/lib/api";
-import {
-  mapApiChatMessages,
-  mapApiChatSummary,
-  type ApiChatDetails,
-} from "@/lib/chat";
-import { consumeSSEStream } from "@/lib/stream";
-import type {
-  AIModelId,
-  AIModelOption,
-  AvailableModelsResponse,
-} from "@/lib/aiModels";
+import { mapApiChatMessages, type ApiChatDetails } from "@/lib/chat";
+
 import { useChatStore } from "@/store/useChatStore";
-import { Button } from "@/components/ui/button";
 import WelcomeBanner from "./WelcomeBanner";
 
 import { markdownComponents } from "./markdownComponents";
-import HistoryCard from "./HistoryCard";
+import DisplayComponent from "./DisplayComponent";
+import { useModels } from "@/hooks/model/useModels";
+import { useStreamingChat } from "@/hooks/chat/useStreamingChat";
+import ModelSelectionComponent from "./ModelSelectionComponent";
+import InputComponents from "./InputComponents";
 
 const ChatArea = () => {
   const [input, setInput] = useState("");
-  const [availableModels, setAvailableModels] = useState<AIModelOption[]>([]);
-  const [selectedModel, setSelectedModel] = useState<AIModelId>("");
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const typingQueueRef = useRef("");
-  const displayedTextRef = useRef("");
-  const typingPromiseRef = useRef<Promise<void> | null>(null);
-  const currentAssistantMessageIdRef = useRef<string | null>(null);
 
   const { user } = useUser();
 
@@ -48,45 +34,21 @@ const ChatArea = () => {
     upsertChat,
   } = useChatStore();
 
+  const { availableModels, selectedModel, setSelectedModel } = useModels();
+
+  const { streamingMessageId, startStream } = useStreamingChat({
+    updateMessageContent,
+    setMessages,
+    setActiveChatId,
+    upsertChat,
+    setSelectedModel,
+  });
+
   const selectedModelOption = availableModels.find(
     (model) => model.id === selectedModel,
   );
 
   const fallbackModelId = availableModels[0]?.id || "";
-
-  // 🔹 Load models
-  useEffect(() => {
-    const loadAvailableModels = async () => {
-      try {
-        const res = await api.get("/chat/models");
-        const data = res.data as AvailableModelsResponse;
-
-        setAvailableModels(data.models);
-
-        setSelectedModel((currentModel) => {
-          if (
-            currentModel &&
-            data.models.some((model) => model.id === currentModel)
-          ) {
-            return currentModel;
-          }
-
-          if (
-            data.defaultModel &&
-            data.models.some((model) => model.id === data.defaultModel)
-          ) {
-            return data.defaultModel;
-          }
-
-          return data.models[0]?.id || "";
-        });
-      } catch {
-        setAvailableModels([]);
-      }
-    };
-
-    void loadAvailableModels();
-  }, []);
 
   // 🔹 Ensure valid model
   useEffect(() => {
@@ -166,7 +128,6 @@ const ChatArea = () => {
     const trimmedInput = input.trim();
 
     if (!trimmedInput || !user?.id || loading) return;
-
     if (!selectedModelOption) return;
 
     const optimisticUserMessage = {
@@ -176,37 +137,10 @@ const ChatArea = () => {
     };
     const assistantTempId = `temp-assistant-${Date.now()}`;
 
-    const flushTypingQueue = async () => {
-      if (typingPromiseRef.current) {
-        await typingPromiseRef.current;
-      }
-    };
-
-    const startTypingDrain = () => {
-      if (typingPromiseRef.current) {
-        return;
-      }
-
-      typingPromiseRef.current = (async () => {
-        while (typingQueueRef.current.length > 0) {
-          const nextSlice = typingQueueRef.current.slice(0, 5);
-          typingQueueRef.current = typingQueueRef.current.slice(nextSlice.length);
-          displayedTextRef.current += nextSlice;
-          if (currentAssistantMessageIdRef.current) {
-            updateMessageContent(
-              currentAssistantMessageIdRef.current,
-              displayedTextRef.current,
-            );
-          }
-          await new Promise((resolve) => setTimeout(resolve, 8));
-        }
-
-        typingPromiseRef.current = null;
-      })();
-    };
-
     setInput("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
 
     addMessage(optimisticUserMessage);
     addMessage({
@@ -214,71 +148,18 @@ const ChatArea = () => {
       role: "assistant",
       content: "",
     });
-    currentAssistantMessageIdRef.current = assistantTempId;
-    setStreamingMessageId(assistantTempId);
-    typingQueueRef.current = "";
-    displayedTextRef.current = "";
     setLoading(true);
 
     try {
-      const baseUrl = api.defaults.baseURL || "";
-      const response = await fetch(`${baseUrl}/chat/stream`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chatId: activeChatId || undefined,
-          userId: activeChatId ? undefined : user.id,
-          message: trimmedInput,
-          provider: selectedModelOption.provider,
-          model: selectedModelOption.id,
-        }),
+      await startStream({
+        assistantTempId,
+        chatId: activeChatId || undefined,
+        userId: activeChatId ? undefined : user.id,
+        message: trimmedInput,
+        provider: selectedModelOption.provider,
+        model: selectedModelOption.id,
       });
-
-      await consumeSSEStream(response, async (event) => {
-        if (event.type === "chunk") {
-          typingQueueRef.current += event.content;
-          startTypingDrain();
-          return;
-        }
-
-        if (event.type === "complete") {
-          await flushTypingQueue();
-
-          const chat = event.chat as ApiChatDetails;
-          setActiveChatId(chat._id);
-          setMessages(mapApiChatMessages(chat));
-          upsertChat(mapApiChatSummary(chat));
-
-          if (chat.modelId) {
-            setSelectedModel(chat.modelId);
-          }
-
-          return;
-        }
-
-        if (event.type === "error") {
-          typingQueueRef.current = "";
-          displayedTextRef.current = event.error;
-          if (currentAssistantMessageIdRef.current) {
-            updateMessageContent(currentAssistantMessageIdRef.current, event.error);
-          }
-        }
-      });
-    } catch {
-      if (currentAssistantMessageIdRef.current) {
-        updateMessageContent(
-          currentAssistantMessageIdRef.current,
-          "Sorry, I could not get a response right now. Please try again after sometime.",
-        );
-      }
     } finally {
-      typingQueueRef.current = "";
-      displayedTextRef.current = "";
-      typingPromiseRef.current = null;
-      currentAssistantMessageIdRef.current = null;
-      setStreamingMessageId(null);
       setLoading(false);
     }
   };
@@ -293,7 +174,7 @@ const ChatArea = () => {
         {messages.length === 0 ? (
           <WelcomeBanner />
         ) : (
-          <HistoryCard
+          <DisplayComponent
             messages={messages}
             loading={loading}
             streamingMessageId={streamingMessageId}
@@ -305,67 +186,20 @@ const ChatArea = () => {
       {/* 🔹 Input Area */}
       <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-6 fixed bottom-0 left-0 lg:left-64 w-full lg:w-[calc(100%-16rem)] bg-white dark:bg-gray-900 z-10 shadow-2xl backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
         <div className="w-full max-w-full sm:max-w-4xl mx-auto">
-          {/* Model Select */}
-          <div className="mb-4 flex justify-end">
-            <div className="relative">
-              {/* Label (optional but improves UX) */}
-              <span className="absolute -top-2 left-3 px-1 text-xs bg-white dark:bg-gray-900 text-gray-500">
-                Model
-              </span>
+          <ModelSelectionComponent
+            availableModels={availableModels}
+            selectedModel={selectedModel}
+            loading={loading}
+            onModelChange={setSelectedModel}
+          />
 
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                disabled={loading || availableModels.length === 0}
-                className="appearance-none bg-white dark:bg-gray-900 
-      border border-gray-300 dark:border-gray-700
-      text-sm font-medium text-gray-900 dark:text-white
-      rounded-full px-4 py-2 pr-10
-      shadow-sm
-      focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white
-      hover:border-gray-400 dark:hover:border-gray-500
-      transition-all duration-200
-      disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {availableModels.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.label}
-                  </option>
-                ))}
-              </select>
-
-              {/* Custom Dropdown Arrow */}
-              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
-                ▼
-              </div>
-            </div>
-          </div>
-
-          {/* Input */}
-          <div className="flex gap-2 sm:gap-3 items-center">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              placeholder="Ask me anything..."
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSendMessage();
-                }
-              }}
-              disabled={loading}
-              rows={1}
-              className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
-            />
-
-            <Button
-              onClick={() => void handleSendMessage()}
-              disabled={!input.trim() || loading}
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
+          <InputComponents
+            input={input}
+            loading={loading}
+            textareaRef={textareaRef}
+            onInputChange={setInput}
+            onSend={handleSendMessage}
+          />
         </div>
       </div>
     </div>
