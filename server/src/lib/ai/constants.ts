@@ -8,9 +8,9 @@ export const AI_MODELS: AIModelOption[] = [
     description: "Fastest Gemini option for everyday chat.",
   },
   {
-    id: "gemini-2.5-flash",
+    id: "gemini-2.5-flash-lite",
     provider: "gemini",
-    label: "Gemini 2.5 Flash",
+    label: "Gemini 2.5 Flash-Lite",
     description: "Stronger Gemini model for richer answers.",
   },
   {
@@ -47,7 +47,7 @@ export const getProviderForModel = (model: AIModelId): AIProvider =>
 
 export const isValidProviderModelPair = (
   provider: AIProvider,
-  model: AIModelId
+  model: AIModelId,
 ) => getProviderForModel(model) === provider;
 
 export const resolveAISelection = (selection?: {
@@ -69,7 +69,8 @@ export const resolveAISelection = (selection?: {
 
   const model = (selection?.model as AIModelId | undefined) || DEFAULT_AI_MODEL;
   const provider =
-    (selection?.provider as AIProvider | undefined) || getProviderForModel(model);
+    (selection?.provider as AIProvider | undefined) ||
+    getProviderForModel(model);
 
   if (!isValidProviderModelPair(provider, model)) {
     throw new Error("Selected model does not belong to the chosen provider");

@@ -131,6 +131,13 @@ export const useStreamingChat = ({
       });
 
       await consumeSSEStream(response, async (event) => {
+        // console.log("Stream event:", event);
+
+        if (event.type === "start") {
+          const chat = event.chat as ApiChatDetails;
+          upsertChat(mapApiChatSummary(chat));
+        }
+
         if (event.type === "chunk") {
           typingQueueRef.current += event.content;
           startTypingDrain();
@@ -140,10 +147,12 @@ export const useStreamingChat = ({
         if (event.type === "complete") {
           await flushTypingQueue();
 
+                // console.log("Stream data:", event.chat);
           const chat = event.chat as ApiChatDetails;
           setActiveChatId(chat._id);
           setMessages(mapApiChatMessages(chat));
-          upsertChat(mapApiChatSummary(chat));
+          // upsertChat(mapApiChatSummary(chat));
+          //  console.log("Stream formatted data:", mapApiChatSummary(chat));
 
           if (chat.modelId) {
             setSelectedModel(chat.modelId);
@@ -153,9 +162,11 @@ export const useStreamingChat = ({
         }
 
         if (event.type === "error") {
-          console.log("Stream error:", JSON.stringify(event.error));
+          const err= JSON.parse(JSON.parse(event.error).error.message).error.message
+          // const msg = "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later"
+          // console.log("Stream error:", err);
           typingQueueRef.current = "";
-          displayedTextRef.current = event.error || STREAM_ERROR_MESSAGE;
+          displayedTextRef.current = err || STREAM_ERROR_MESSAGE;
           updateMessageContent(assistantTempId, displayedTextRef.current);
         }
       });

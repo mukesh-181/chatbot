@@ -1,6 +1,14 @@
-import { addMessageSchema, buildChatTitle, createChatSchema, streamChatSchema } from "../utils/zodValidation";
+import {
+  addMessageSchema,
+  buildChatTitle,
+  createChatSchema,
+  streamChatSchema,
+} from "../utils/zodValidation";
 import { getAvailableAIModels, resolveAISelection } from "../lib/ai/constants";
-import { generateChatReply, generateChatReplyStream } from "../lib/ai/services/chat-completion.service";
+import {
+  generateChatReply,
+  generateChatReplyStream,
+} from "../lib/ai/services/chat-completion.service";
 import { normalizeAIResponse } from "../lib/ai/responseFormatter";
 import { Chat } from "../models/chat.model";
 import { formatError } from "zod";
@@ -11,15 +19,11 @@ const getErrorMessage = (error: unknown) =>
     ? error.message
     : "Failed to generate response";
 
-
-
-
-
 export const createNewChat = async (req: any, res: any) => {
   const parsed = createChatSchema.safeParse(req.body);
 
   if (!parsed.success) {
-    return res.status(400).json({ error:formatError(parsed.error)});
+    return res.status(400).json({ error: formatError(parsed.error) });
   }
 
   const { userId, message } = parsed.data;
@@ -49,11 +53,9 @@ export const createNewChat = async (req: any, res: any) => {
     console.error("Create chat failed:", error);
     return res.status(500).json({ error: getErrorMessage(error) });
   }
-}
+};
 
-
-
-export const getIndividualChatDetails =async (req : any, res : any) => {
+export const getIndividualChatDetails = async (req: any, res: any) => {
   const chat = await Chat.findById(req.params.id);
 
   if (!chat) {
@@ -61,11 +63,7 @@ export const getIndividualChatDetails =async (req : any, res : any) => {
   }
 
   return res.json(chat);
-}
-
-
-
-
+};
 
 export const updatePrevChat = async (req: any, res: any) => {
   const parsed = addMessageSchema.safeParse(req.body);
@@ -87,10 +85,12 @@ export const updatePrevChat = async (req: any, res: any) => {
   });
 
   try {
-    const history = chat.messages.map((item) => ({
-      role: item.role,
-      content: item.content,
-    })).slice(-8);
+    const history = chat.messages
+      .map((item) => ({
+        role: item.role,
+        content: item.content,
+      }))
+      .slice(-8);
 
     const reply = await generateChatReply({
       history,
@@ -115,10 +115,7 @@ export const updatePrevChat = async (req: any, res: any) => {
     console.error("Add message failed:", error);
     return res.status(500).json({ error: getErrorMessage(error) });
   }
-}
-
-
-
+};
 
 export const getUserChats = async (req: any, res: any) => {
   const chats = await Chat.find({ userId: req.params.userId })
@@ -126,18 +123,13 @@ export const getUserChats = async (req: any, res: any) => {
     .select("_id title updatedAt")
     .lean();
 
-    const formattedChats = chats.map((chat) => ({
-      _id: String(chat._id),
-      title: chat.title,
-      updatedAt: chat.updatedAt,
-    }))
-  return res.json(
-    formattedChats
-  );
-}
-
-
-
+  const formattedChats = chats.map((chat) => ({
+    _id: String(chat._id),
+    title: chat.title,
+    updatedAt: chat.updatedAt,
+  }));
+  return res.json(formattedChats);
+};
 
 export const deleteChat = async (req: any, res: any) => {
   const chat = await Chat.findByIdAndDelete(req.params.id);
@@ -149,14 +141,93 @@ export const deleteChat = async (req: any, res: any) => {
   return res.json({ success: true });
 };
 
-
-
 export const getAvailableModels = async (_req: any, res: any) => {
   return res.json({
     defaultModel: getAvailableAIModels()[0]?.id || null,
     models: getAvailableAIModels(),
   });
 };
+
+// export const streamChatResponse = async (req: any, res: any) => {
+//   const parsed = streamChatSchema.safeParse(req.body);
+
+//   if (!parsed.success) {
+//     return res.status(400).json({ error: formatError(parsed.error) });
+//   }
+
+//   const { chatId, userId, message } = parsed.data;
+//   let chat = chatId ? await Chat.findById(chatId) : null;
+
+//   if (chatId && !chat) {
+//     return res.status(404).json({ error: "Chat not found" });
+//   }
+
+//   const { provider, model } = resolveAISelection({
+//     provider: parsed.data.provider || chat?.provider,
+//     model: parsed.data.model || chat?.modelId,
+//   });
+
+//   const history = chat
+//     ? chat.messages
+//         .map((item) => ({
+//           role: item.role,
+//           content: item.content,
+//         }))
+//         .slice(-8)
+//     : [];
+
+//   initSSE(res);
+
+//   try {
+//     const stream = generateChatReplyStream({
+//       history,
+//       latestMessage: message,
+//       provider,
+//       model,
+//     });
+
+//     let fullReply = "";
+
+//     for await (const chunk of stream) {
+//       fullReply += chunk;
+//       writeSSE(res, { type: "chunk", content: chunk, chat });
+//     }
+
+//     const assistantMessage = normalizeAIResponse(fullReply);
+
+//     chat =
+//       chat ||
+//       (await Chat.create({
+//         userId,
+//         title: buildChatTitle(message),
+//         provider,
+//         modelId: model,
+//         messages: [],
+//       }));
+
+//     chat.messages.push({ role: "user", content: message });
+//     chat.messages.push({ role: "assistant", content: assistantMessage });
+//     chat.provider = provider;
+//     chat.modelId = model;
+
+//     if (!chat.title?.trim()) {
+//       chat.title = buildChatTitle(message);
+//     }
+
+//     await chat.save();
+
+//     writeSSE(res, { type: "complete", chat });
+//     writeSSE(res, { type: "done" });
+//     return res.end();
+//   } catch (error) {
+//     console.error("Stream chat failed:", error);
+//     writeSSE(res, {
+//       type: "error",
+//       error: getErrorMessage(error),
+//     });
+//     return res.end();
+//   }
+// };
 
 export const streamChatResponse = async (req: any, res: any) => {
   const parsed = streamChatSchema.safeParse(req.body);
@@ -198,6 +269,19 @@ export const streamChatResponse = async (req: any, res: any) => {
 
     let fullReply = "";
 
+    if (stream) {
+      chat =
+        chat ||
+        (await Chat.create({
+          userId,
+          title: buildChatTitle(message),
+          provider,
+          modelId: model,
+          messages: [],
+        }));
+
+      writeSSE(res, { type: "start", chat });
+    }
     for await (const chunk of stream) {
       fullReply += chunk;
       writeSSE(res, { type: "chunk", content: chunk });
@@ -205,26 +289,16 @@ export const streamChatResponse = async (req: any, res: any) => {
 
     const assistantMessage = normalizeAIResponse(fullReply);
 
-    chat =
-      chat ||
-      (await Chat.create({
-        userId,
-        title: buildChatTitle(message),
-        provider,
-        modelId: model,
-        messages: [],
-      }));
+    chat!.messages.push({ role: "user", content: message });
+    chat!.messages.push({ role: "assistant", content: assistantMessage });
+    chat!.provider = provider;
+    chat!.modelId = model;
 
-    chat.messages.push({ role: "user", content: message });
-    chat.messages.push({ role: "assistant", content: assistantMessage });
-    chat.provider = provider;
-    chat.modelId = model;
-
-    if (!chat.title?.trim()) {
-      chat.title = buildChatTitle(message);
+    if (!chat!.title?.trim()) {
+      chat!.title = buildChatTitle(message);
     }
 
-    await chat.save();
+    await chat!.save();
 
     writeSSE(res, { type: "complete", chat });
     writeSSE(res, { type: "done" });

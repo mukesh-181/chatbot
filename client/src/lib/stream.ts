@@ -1,4 +1,5 @@
 export type StreamEvent =
+  | { type: "start"; chat: unknown }
   | { type: "chunk"; content: string }
   | { type: "complete"; chat: unknown }
   | { type: "done" }

@@ -1,4 +1,5 @@
 export const writeSSE = (res: any, payload: unknown) => {
+  // console.log("Sending SSE chunk:", payload);
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 };
 
