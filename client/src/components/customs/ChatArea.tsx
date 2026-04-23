@@ -8,6 +8,7 @@ import {
   mapApiChatSummary,
   type ApiChatDetails,
 } from "@/lib/chat";
+import { consumeSSEStream } from "@/lib/stream";
 import type {
   AIModelId,
   AIModelOption,
@@ -24,9 +25,14 @@ const ChatArea = () => {
   const [input, setInput] = useState("");
   const [availableModels, setAvailableModels] = useState<AIModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<AIModelId>("");
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingQueueRef = useRef("");
+  const displayedTextRef = useRef("");
+  const typingPromiseRef = useRef<Promise<void> | null>(null);
+  const currentAssistantMessageIdRef = useRef<string | null>(null);
 
   const { user } = useUser();
 
@@ -38,6 +44,7 @@ const ChatArea = () => {
     setActiveChatId,
     setLoading,
     setMessages,
+    updateMessageContent,
     upsertChat,
   } = useChatStore();
 
@@ -103,8 +110,9 @@ const ChatArea = () => {
       try {
         const res = await api.get(`/chat/${activeChatId}`);
         const chat = res.data as ApiChatDetails;
+        const nextMessages = mapApiChatMessages(chat);
 
-        setMessages(mapApiChatMessages(chat));
+        setMessages(nextMessages);
 
         if (
           chat.modelId &&
@@ -166,44 +174,111 @@ const ChatArea = () => {
       role: "user" as const,
       content: trimmedInput,
     };
+    const assistantTempId = `temp-assistant-${Date.now()}`;
+
+    const flushTypingQueue = async () => {
+      if (typingPromiseRef.current) {
+        await typingPromiseRef.current;
+      }
+    };
+
+    const startTypingDrain = () => {
+      if (typingPromiseRef.current) {
+        return;
+      }
+
+      typingPromiseRef.current = (async () => {
+        while (typingQueueRef.current.length > 0) {
+          const nextSlice = typingQueueRef.current.slice(0, 5);
+          typingQueueRef.current = typingQueueRef.current.slice(nextSlice.length);
+          displayedTextRef.current += nextSlice;
+          if (currentAssistantMessageIdRef.current) {
+            updateMessageContent(
+              currentAssistantMessageIdRef.current,
+              displayedTextRef.current,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 8));
+        }
+
+        typingPromiseRef.current = null;
+      })();
+    };
 
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     addMessage(optimisticUserMessage);
+    addMessage({
+      id: assistantTempId,
+      role: "assistant",
+      content: "",
+    });
+    currentAssistantMessageIdRef.current = assistantTempId;
+    setStreamingMessageId(assistantTempId);
+    typingQueueRef.current = "";
+    displayedTextRef.current = "";
     setLoading(true);
 
     try {
-      const res = activeChatId
-        ? await api.post(`/chat/${activeChatId}/messages`, {
-            message: trimmedInput,
-            provider: selectedModelOption.provider,
-            model: selectedModelOption.id,
-          })
-        : await api.post("/chat", {
-            userId: user.id,
-            message: trimmedInput,
-            provider: selectedModelOption.provider,
-            model: selectedModelOption.id,
-          });
-
-      const chat = res.data as ApiChatDetails;
-
-      setActiveChatId(chat._id);
-      setMessages(mapApiChatMessages(chat));
-      upsertChat(mapApiChatSummary(chat));
-
-      if (chat.modelId) {
-        setSelectedModel(chat.modelId);
-      }
-    } catch {
-      addMessage({
-        id: `temp-assistant-${Date.now()}`,
-        role: "assistant",
-        content:
-          "Sorry, I could not get a response right now. Please try again after sometime.",
+      const baseUrl = api.defaults.baseURL || "";
+      const response = await fetch(`${baseUrl}/chat/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chatId: activeChatId || undefined,
+          userId: activeChatId ? undefined : user.id,
+          message: trimmedInput,
+          provider: selectedModelOption.provider,
+          model: selectedModelOption.id,
+        }),
       });
+
+      await consumeSSEStream(response, async (event) => {
+        if (event.type === "chunk") {
+          typingQueueRef.current += event.content;
+          startTypingDrain();
+          return;
+        }
+
+        if (event.type === "complete") {
+          await flushTypingQueue();
+
+          const chat = event.chat as ApiChatDetails;
+          setActiveChatId(chat._id);
+          setMessages(mapApiChatMessages(chat));
+          upsertChat(mapApiChatSummary(chat));
+
+          if (chat.modelId) {
+            setSelectedModel(chat.modelId);
+          }
+
+          return;
+        }
+
+        if (event.type === "error") {
+          typingQueueRef.current = "";
+          displayedTextRef.current = event.error;
+          if (currentAssistantMessageIdRef.current) {
+            updateMessageContent(currentAssistantMessageIdRef.current, event.error);
+          }
+        }
+      });
+    } catch {
+      if (currentAssistantMessageIdRef.current) {
+        updateMessageContent(
+          currentAssistantMessageIdRef.current,
+          "Sorry, I could not get a response right now. Please try again after sometime.",
+        );
+      }
     } finally {
+      typingQueueRef.current = "";
+      displayedTextRef.current = "";
+      typingPromiseRef.current = null;
+      currentAssistantMessageIdRef.current = null;
+      setStreamingMessageId(null);
       setLoading(false);
     }
   };
@@ -221,6 +296,7 @@ const ChatArea = () => {
           <HistoryCard
             messages={messages}
             loading={loading}
+            streamingMessageId={streamingMessageId}
             markdownComponents={markdownComponents}
           />
         )}

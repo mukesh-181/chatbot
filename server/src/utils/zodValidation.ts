@@ -1,17 +1,16 @@
 import { z } from "zod";
-import { isValidProviderModelPair } from "../lib/ai/constants";
+import { getModelById, isValidProviderModelPair } from "../lib/ai/constants";
 
-const modelSchema = z.enum([
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-  "gpt-4.1-mini",
-  "gpt-4.1",
-]);
+const modelSchema = z.string().trim().min(1, "model is required");
 
 const aiSelectionSchema = z
   .object({
-    provider: z.enum(["gemini", "openai"]).optional(),
+    provider: z.enum(["gemini", "openai", "nvidia"]).optional(),
     model: modelSchema.optional(),
+  })
+  .refine(({ model }) => !model || !!getModelById(model), {
+    message: "Unsupported AI model",
+    path: ["model"],
   })
   .refine(
     ({ provider, model }) =>
@@ -34,5 +33,17 @@ export const addMessageSchema = z
     message: z.string().trim().min(1, "message is required"),
   })
   .merge(aiSelectionSchema);
+
+export const streamChatSchema = z
+  .object({
+    chatId: z.string().trim().optional(),
+    userId: z.string().trim().optional(),
+    message: z.string().trim().min(1, "message is required"),
+  })
+  .merge(aiSelectionSchema)
+  .refine(({ chatId, userId }) => !!chatId || !!userId, {
+    message: "userId is required when chatId is missing",
+    path: ["userId"],
+  });
 
 export const buildChatTitle = (message: string) => message.trim().slice(0, 40) || "New Chat";

@@ -27,7 +27,6 @@ export class GeminiAdapter implements AIProviderAdapter {
       contents: buildUnifiedPrompt(history, latestMessage),
     });
 
-      console.log("Gemini raw response:", result);
     const text = result.text?.trim();
 
     if (!text) {
@@ -35,5 +34,24 @@ export class GeminiAdapter implements AIProviderAdapter {
     }
 
     return normalizeAIResponse(text);
+  }
+
+  async *generateReplyStream(
+    history: ChatHistoryMessage[],
+    latestMessage: string,
+    model: string
+  ): AsyncGenerator<string> {
+    const stream = await this.client.models.generateContentStream({
+      model,
+      contents: buildUnifiedPrompt(history, latestMessage),
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.text;
+
+      if (text) {
+        yield text;
+      }
+    }
   }
 }

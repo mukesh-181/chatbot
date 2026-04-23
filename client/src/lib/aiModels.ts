@@ -1,4 +1,4 @@
-export type AIProvider = "gemini" | "openai";
+export type AIProvider = "gemini" | "openai" | "nvidia";
 
 export type AIModelId = string;
 

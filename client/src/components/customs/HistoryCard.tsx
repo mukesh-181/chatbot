@@ -8,12 +8,14 @@ type HistoryCardProps = {
     content: string;
   }[];
   loading: boolean;
+  streamingMessageId?: string | null;
   markdownComponents: any;
 };
 
 const HistoryCard = ({
   messages,
   loading,
+  streamingMessageId,
   markdownComponents,
 }: HistoryCardProps) => {
   return (
@@ -38,12 +40,15 @@ const HistoryCard = ({
                 <ReactMarkdown components={markdownComponents}>
                   {message.content}
                 </ReactMarkdown>
+                {streamingMessageId === message.id && (
+                  <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-blue-500 align-middle" />
+                )}
               </div>
             </div>
           </div>
         ))}
 
-        {loading && (
+        {loading && !streamingMessageId && (
           <div className="flex justify-start">
             <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700">
               <div className="flex gap-2">

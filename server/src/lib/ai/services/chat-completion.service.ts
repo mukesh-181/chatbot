@@ -13,3 +13,15 @@ export const generateChatReply = async ({
 
   return adapter.generateReply(history, latestMessage, model);
 };
+
+export const generateChatReplyStream = ({
+  history,
+  latestMessage,
+  provider,
+  model,
+}: GenerateReplyInput) => {
+  const resolvedProvider = provider || getProviderForModel(model);
+  const adapter = getAIProviderAdapter(resolvedProvider);
+
+  return adapter.generateReplyStream(history, latestMessage, model);
+};

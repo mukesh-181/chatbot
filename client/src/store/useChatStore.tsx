@@ -23,6 +23,7 @@ type ChatState = {
   removeChat: (chatId: string) => void;
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
+  updateMessageContent: (messageId: string, content: string) => void;
   setLoading: (loading: boolean) => void;
   clearChat: () => void;
 };
@@ -53,6 +54,13 @@ export const useChatStore = create<ChatState>((set) => ({
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, message],
+    })),
+
+  updateMessageContent: (messageId, content) =>
+    set((state) => ({
+      messages: state.messages.map((message) =>
+        message.id === messageId ? { ...message, content } : message
+      ),
     })),
 
   setLoading: (loading) => set({ loading }),

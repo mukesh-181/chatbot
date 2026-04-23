@@ -2,15 +2,15 @@ import type { AIModelId, AIModelOption, AIProvider } from "./types";
 
 export const AI_MODELS: AIModelOption[] = [
   {
-    id: "gemini-2.5-flash-lite",
+    id: "gemini-3.1-flash-lite-preview",
     provider: "gemini",
-    label: "Gemini Flash-Lite",
+    label: "Gemini 3.1 Flash-Lite",
     description: "Fastest Gemini option for everyday chat.",
   },
   {
     id: "gemini-2.5-flash",
     provider: "gemini",
-    label: "Gemini Flash",
+    label: "Gemini 2.5 Flash",
     description: "Stronger Gemini model for richer answers.",
   },
   {
@@ -25,9 +25,15 @@ export const AI_MODELS: AIModelOption[] = [
     label: "ChatGPT 4.1",
     description: "Stronger OpenAI model for deeper responses.",
   },
+  {
+    id: "moonshotai/kimi-k2-instruct",
+    provider: "nvidia",
+    label: "NVIDIA Kimi K2 Instruct",
+    description: "OpenAI-compatible NVIDIA-hosted Minimax chat model.",
+  },
 ];
 
-export const DEFAULT_AI_MODEL: AIModelId = "gemini-2.5-flash-lite";
+export const DEFAULT_AI_MODEL: AIModelId = "gemini-3.1-flash-lite-preview";
 
 export const DEFAULT_AI_PROVIDER: AIProvider = "gemini";
 
@@ -51,7 +57,8 @@ export const resolveAISelection = (selection?: {
   if (
     selection?.provider &&
     selection.provider !== "gemini" &&
-    selection.provider !== "openai"
+    selection.provider !== "openai" &&
+    selection.provider !== "nvidia"
   ) {
     throw new Error("Unsupported AI provider");
   }
