@@ -6,7 +6,10 @@ import morgan from "morgan";
 const app = express();
 
 app.use(morgan("dev")); 
-app.use(cors());
+app.use(cors(
+  {origin: ["http://localhost:5173","https://chatbot-1-55zr.onrender.com"], // Adjust this to your frontend URL
+   credentials: true}
+));
 app.use(express.json());
 
 
