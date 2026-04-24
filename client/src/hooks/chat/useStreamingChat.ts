@@ -55,14 +55,16 @@ export const useStreamingChat = ({
   };
 
   const getChunkSize = (queue: string) => {
-    if (queue.length < 20) return 1;
-    if (queue.length < 100) return 2;
-    return 4;
+    // Increase chunk sizes for faster display
+    if (queue.length < 50) return 5;
+    if (queue.length < 200) return 15;
+    return 25;
   };
 
   const getDelay = (text: string) => {
-    if (/[.,!?]$/.test(text)) return 120;
-    return 16;
+    // Shorter delays for faster streaming
+    if (/[.,!?]$/.test(text)) return 8;
+    return 4;
   };
 
   const resetStreamState = () => {
@@ -93,7 +95,9 @@ export const useStreamingChat = ({
           );
         }
 
-        await new Promise((resolve) => setTimeout(resolve, getDelay(nextSlice)));
+        // Use dynamic delay based on punctuation
+        const delay = getDelay(nextSlice);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
       typingPromiseRef.current = null;

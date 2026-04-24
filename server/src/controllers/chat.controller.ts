@@ -230,6 +230,7 @@ export const getAvailableModels = async (_req: any, res: any) => {
 // };
 
 export const streamChatResponse = async (req: any, res: any) => {
+  let isnewChat = false;
   const parsed = streamChatSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -238,6 +239,10 @@ export const streamChatResponse = async (req: any, res: any) => {
 
   const { chatId, userId, message } = parsed.data;
   let chat = chatId ? await Chat.findById(chatId) : null;
+
+  if (!chatId || !chat) {
+    isnewChat = true;
+  }
 
   if (chatId && !chat) {
     return res.status(404).json({ error: "Chat not found" });
@@ -269,41 +274,53 @@ export const streamChatResponse = async (req: any, res: any) => {
 
     let fullReply = "";
 
-    if (stream) {
-      chat =
-        chat ||
-        (await Chat.create({
-          userId,
-          title: buildChatTitle(message),
-          provider,
-          modelId: model,
-          messages: [],
-        }));
+    chat =
+      chat ||
+      (await Chat.create({
+        userId,
+        title: buildChatTitle(message),
+        provider,
+        modelId: model,
+        messages: [],
+      }));
 
-      writeSSE(res, { type: "start", chat });
-    }
+    chat.messages.push({ role: "user", content: message });
+    await chat.save();
+    writeSSE(res, { type: "start", chat });
+    
     for await (const chunk of stream) {
       fullReply += chunk;
+      // Only send chunk content, not entire chat object for each chunk
       writeSSE(res, { type: "chunk", content: chunk });
     }
 
     const assistantMessage = normalizeAIResponse(fullReply);
 
-    chat!.messages.push({ role: "user", content: message });
-    chat!.messages.push({ role: "assistant", content: assistantMessage });
-    chat!.provider = provider;
-    chat!.modelId = model;
+    chat.messages.push({ role: "assistant", content: assistantMessage });
+    chat.provider = provider;
+    chat.modelId = model;
 
-    if (!chat!.title?.trim()) {
-      chat!.title = buildChatTitle(message);
+    if (!chat.title?.trim()) {
+      chat.title = buildChatTitle(message);
     }
 
-    await chat!.save();
+    await chat.save();
+
+    if (isnewChat) {
+      isnewChat = false; // Reset the flag after successful creation
+    }
 
     writeSSE(res, { type: "complete", chat });
     writeSSE(res, { type: "done" });
     return res.end();
   } catch (error) {
+    if (isnewChat && chat) {
+      await Chat.findByIdAndDelete(chat._id);
+    } else if (!isnewChat && chat) {
+      chat.messages.pop(); // Remove the last user message which caused the error
+      await chat.save();
+    }
+
     console.error("Stream chat failed:", error);
     writeSSE(res, {
       type: "error",

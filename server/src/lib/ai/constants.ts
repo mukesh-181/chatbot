@@ -2,17 +2,25 @@ import type { AIModelId, AIModelOption, AIProvider } from "./types";
 
 export const AI_MODELS: AIModelOption[] = [
   {
+    id: "openai/gpt-oss-120b",
+    provider: "nvidia",
+    label: "GPT OSS 120B",
+    description: "OpenAI-compatible NVIDIA-hosted Gpt chat model.",
+  },
+    {
+    id: "qwen/qwen3-next-80b-a3b-instruct",
+    provider: "nvidia",
+    label: "Qwen 3 Next 80B A3B Instruct",
+    description: "OpenAI-compatible NVIDIA-hosted Qwen chat model.",
+  },
+  
+  {
     id: "gemini-3.1-flash-lite-preview",
     provider: "gemini",
     label: "Gemini 3.1 Flash-Lite",
     description: "Fastest Gemini option for everyday chat.",
   },
-  {
-    id: "gemini-2.5-flash-lite",
-    provider: "gemini",
-    label: "Gemini 2.5 Flash-Lite",
-    description: "Stronger Gemini model for richer answers.",
-  },
+ 
   {
     id: "gpt-4.1-mini",
     provider: "openai",
@@ -33,9 +41,9 @@ export const AI_MODELS: AIModelOption[] = [
   },
 ];
 
-export const DEFAULT_AI_MODEL: AIModelId = "gemini-3.1-flash-lite-preview";
+export const DEFAULT_AI_MODEL: AIModelId = "openai/gpt-oss-120b";
 
-export const DEFAULT_AI_PROVIDER: AIProvider = "gemini";
+export const DEFAULT_AI_PROVIDER: AIProvider = "nvidia";
 
 export const getModelById = (model: AIModelId) =>
   AI_MODELS.find((item) => item.id === model);

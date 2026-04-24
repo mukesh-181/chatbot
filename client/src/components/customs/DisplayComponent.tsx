@@ -1,5 +1,7 @@
 
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 
 type DisplayComponentProps = {
   messages: {
@@ -12,7 +14,17 @@ type DisplayComponentProps = {
   markdownComponents: any;
 };
 
-const HistoryCard = ({
+// Normalize markdown content by removing excessive blank lines
+const normalizeMarkdown = (content: string): string => {
+  return content
+    // // Replace 3+ consecutive newlines with just 2
+    .replace(/\n\n\n+/g, "\n\n")
+    // // Remove leading/trailing whitespace
+    .trim();
+   
+};
+
+const DisplayComponent = ({
   messages,
   loading,
   streamingMessageId,
@@ -37,9 +49,13 @@ const HistoryCard = ({
               }`}
             >
               <div className="whitespace-pre-wrap wrap-break-words leading-6 sm:leading-7 text-sm sm:text-base">
-                <ReactMarkdown components={markdownComponents}>
-                  {message.content}
+                <ReactMarkdown 
+                  components={markdownComponents}
+                  remarkPlugins={[remarkGfm]}
+                >
+                  {normalizeMarkdown(message.content)}
                 </ReactMarkdown>
+            
                 {streamingMessageId === message.id && (
                   <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-blue-500 align-middle" />
                 )}
@@ -65,4 +81,4 @@ const HistoryCard = ({
   );
 };
 
-export default HistoryCard;
+export default DisplayComponent;
