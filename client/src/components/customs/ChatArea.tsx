@@ -30,18 +30,29 @@ const ChatArea = () => {
     setActiveChatId,
     setLoading,
     setMessages,
-    updateMessageContent,
     upsertChat,
+    streamingChatId,
+    streamingMessageId,
+    setStreamingChatId,
+    setStreamingMessageId,
+    streamingMessages,
+    setStreamingMessages,
+    updateStreamingMessageContent,
+    clearStreamingMessages,
   } = useChatStore();
 
   const { availableModels, selectedModel, setSelectedModel } = useModels();
 
-  const { streamingMessageId, isStreaming, startStream, abortStream } = useStreamingChat({
-    updateMessageContent,
+  const { isStreaming, startStream, abortStream } = useStreamingChat({
     setMessages,
     setActiveChatId,
     upsertChat,
     setSelectedModel,
+    setStreamingChatId,
+    setStreamingMessageId,
+    updateStreamingMessageContent,
+    setStreamingMessages,
+    clearStreamingMessages,
   });
 
   const selectedModelOption = availableModels.find(
@@ -164,6 +175,9 @@ const ChatArea = () => {
     }
   };
 
+  // Determine which messages to display
+  const displayMessages = streamingChatId === activeChatId ? streamingMessages : messages;
+
   return (
     <div className="flex flex-col h-full w-full bg-linear-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
       {/* 🔹 Chat Messages Area */}
@@ -171,11 +185,11 @@ const ChatArea = () => {
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-3 sm:p-6 pb-40 sm:pb-56"
       >
-        {messages.length === 0 ? (
+        {displayMessages.length === 0 ? (
           <WelcomeBanner />
         ) : (
           <DisplayComponent
-            messages={messages}
+            messages={displayMessages}
             loading={loading}
             streamingMessageId={streamingMessageId}
             markdownComponents={markdownComponents}

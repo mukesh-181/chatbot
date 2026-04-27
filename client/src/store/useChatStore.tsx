@@ -17,6 +17,9 @@ type ChatState = {
   chats: ChatSummary[];
   messages: Message[];
   loading: boolean;
+  streamingChatId: string | null;
+  streamingMessageId: string | null;
+  streamingMessages: Message[];
   setActiveChatId: (chatId: string | null) => void;
   setChats: (chats: ChatSummary[]) => void;
   upsertChat: (chat: ChatSummary) => void;
@@ -26,6 +29,12 @@ type ChatState = {
   updateMessageContent: (messageId: string, content: string) => void;
   setLoading: (loading: boolean) => void;
   clearChat: () => void;
+  setStreamingChatId: (chatId: string | null) => void;
+  setStreamingMessageId: (messageId: string | null) => void;
+  setStreamingMessages: (messages: Message[]) => void;
+  updateStreamingMessageContent: (messageId: string, content: string) => void;
+  addStreamingMessage: (message: Message) => void;
+  clearStreamingMessages: () => void;
 };
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -33,6 +42,9 @@ export const useChatStore = create<ChatState>((set) => ({
   chats: [],
   messages: [],
   loading: false,
+  streamingChatId: null,
+  streamingMessageId: null,
+  streamingMessages: [],
 
   setActiveChatId: (activeChatId) => set({ activeChatId }),
 
@@ -66,4 +78,24 @@ export const useChatStore = create<ChatState>((set) => ({
   setLoading: (loading) => set({ loading }),
 
   clearChat: () => set({ activeChatId: null, messages: [] }),
+
+  setStreamingChatId: (streamingChatId) => set({ streamingChatId }),
+
+  setStreamingMessageId: (streamingMessageId) => set({ streamingMessageId }),
+
+  setStreamingMessages: (streamingMessages) => set({ streamingMessages }),
+
+  updateStreamingMessageContent: (messageId, content) =>
+    set((state) => ({
+      streamingMessages: state.streamingMessages.map((message) =>
+        message.id === messageId ? { ...message, content } : message
+      ),
+    })),
+
+  addStreamingMessage: (message) =>
+    set((state) => ({
+      streamingMessages: [...state.streamingMessages, message],
+    })),
+
+  clearStreamingMessages: () => set({ streamingMessages: [] }),
 }));

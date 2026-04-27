@@ -20,7 +20,6 @@ type StreamRequest = {
 };
 
 type UseStreamingChatParams = {
-  updateMessageContent: (messageId: string, content: string) => void;
   setMessages: (messages: Message[]) => void;
   setActiveChatId: (chatId: string | null) => void;
   upsertChat: (chat: {
@@ -29,19 +28,27 @@ type UseStreamingChatParams = {
     updatedAt: string;
   }) => void;
   setSelectedModel: (modelId: AIModelId) => void;
+  setStreamingChatId: (chatId: string | null) => void;
+  setStreamingMessageId: (messageId: string | null) => void;
+  updateStreamingMessageContent: (messageId: string, content: string) => void;
+  setStreamingMessages: (messages: Message[]) => void;
+  clearStreamingMessages: () => void;
 };
 
 const STREAM_ERROR_MESSAGE =
   "Sorry, I could not get a response right now. Please try again after sometime.";
 
 export const useStreamingChat = ({
-  updateMessageContent,
   setMessages,
   setActiveChatId,
   upsertChat,
   setSelectedModel,
+  setStreamingChatId,
+  setStreamingMessageId,
+  updateStreamingMessageContent,
+  setStreamingMessages,
+  clearStreamingMessages,
 }: UseStreamingChatParams) => {
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const typingQueueRef = useRef("");
@@ -74,9 +81,11 @@ export const useStreamingChat = ({
     displayedTextRef.current = "";
     typingPromiseRef.current = null;
     currentAssistantMessageIdRef.current = null;
-    setStreamingMessageId(null);
     setIsStreaming(false);
     abortControllerRef.current = null;
+    setStreamingChatId(null);
+    setStreamingMessageId(null);
+    clearStreamingMessages();
   };
 
   const abortStream = () => {
@@ -100,7 +109,7 @@ export const useStreamingChat = ({
         displayedTextRef.current += nextSlice;
 
         if (currentAssistantMessageIdRef.current) {
-          updateMessageContent(
+          updateStreamingMessageContent(
             currentAssistantMessageIdRef.current,
             displayedTextRef.current
           );
@@ -156,6 +165,17 @@ export const useStreamingChat = ({
         if (event.type === "start") {
           const chat = event.chat as ApiChatDetails;
           upsertChat(mapApiChatSummary(chat));
+          // Track which chat is streaming
+          setStreamingChatId(chat._id);
+          
+          // Initialize streaming messages - capture current messages and add streaming assistant message
+          const messages = mapApiChatMessages(chat);
+          const assistantMessage: Message = {
+            id: assistantTempId,
+            role: "assistant",
+            content: "",
+          };
+          setStreamingMessages([...messages, assistantMessage]);
         }
 
         if (event.type === "chunk") {
@@ -187,7 +207,7 @@ export const useStreamingChat = ({
           // console.log("Stream error:", err);
           typingQueueRef.current = "";
           displayedTextRef.current = err || STREAM_ERROR_MESSAGE;
-          updateMessageContent(assistantTempId, displayedTextRef.current);
+          updateStreamingMessageContent(assistantTempId, displayedTextRef.current);
         }
       });
     } catch (error) {
@@ -196,14 +216,13 @@ export const useStreamingChat = ({
         // User clicked stop - keep the partial message that was already displayed
         return;
       }
-      updateMessageContent(assistantTempId, STREAM_ERROR_MESSAGE);
+      updateStreamingMessageContent(assistantTempId, STREAM_ERROR_MESSAGE);
     } finally {
       resetStreamState();
     }
   };
 
   return {
-    streamingMessageId,
     isStreaming,
     startStream,
     abortStream,
