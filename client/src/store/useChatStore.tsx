@@ -77,7 +77,13 @@ export const useChatStore = create<ChatState>((set) => ({
 
   setLoading: (loading) => set({ loading }),
 
-  clearChat: () => set({ activeChatId: null, messages: [] }),
+  clearChat: () => set({ 
+    activeChatId: null, 
+    messages: [],
+    streamingChatId: null,
+    streamingMessageId: null,
+    streamingMessages: []
+  }),
 
   setStreamingChatId: (streamingChatId) => set({ streamingChatId }),
 

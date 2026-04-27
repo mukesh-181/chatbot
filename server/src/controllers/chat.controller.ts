@@ -329,3 +329,53 @@ export const streamChatResponse = async (req: any, res: any) => {
     return res.end();
   }
 };
+
+export const savePartialMessage = async (req: any, res: any) => {
+  try {
+    const { chatId, userId, message, userMessage } = req.body;
+
+    if (!chatId && !userId) {
+      return res.status(400).json({ error: "chatId or userId is required" });
+    }
+
+    let chat = chatId ? await Chat.findById(chatId) : null;
+
+    if (chatId && !chat) {
+      return res.status(404).json({ error: "Chat not found" });
+    }
+
+    // If creating new chat with partial message
+    if (!chat && userId) {
+      chat = await Chat.create({
+        userId,
+        title: buildChatTitle(userMessage || "Partial conversation"),
+        messages: [],
+      });
+    }
+
+    if (!chat) {
+      return res.status(400).json({ error: "Could not create or find chat" });
+    }
+
+    // Add user message if provided
+    if (userMessage && !chat.messages.some(m => m.content === userMessage && m.role === "user")) {
+      chat.messages.push({ role: "user", content: userMessage });
+    }
+
+    // Add or update the partial assistant message
+    const lastMessage = chat.messages[chat.messages.length - 1];
+    if (lastMessage && lastMessage.role === "assistant") {
+      // Update existing assistant message
+      lastMessage.content = message;
+    } else {
+      // Add new assistant message
+      chat.messages.push({ role: "assistant", content: message });
+    }
+
+    await chat.save();
+    return res.json(chat);
+  } catch (error) {
+    console.error("Save partial message failed:", error);
+    return res.status(500).json({ error: getErrorMessage(error) });
+  }
+};

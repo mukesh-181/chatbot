@@ -56,6 +56,11 @@ export const useStreamingChat = ({
   const typingPromiseRef = useRef<Promise<void> | null>(null);
   const currentAssistantMessageIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamContextRef = useRef<{
+    chatId?: string;
+    userId?: string;
+    message: string;
+  } | null>(null);
 
   const flushTypingQueue = async () => {
     if (typingPromiseRef.current) {
@@ -76,22 +81,41 @@ export const useStreamingChat = ({
     return 4;
   };
 
-  const resetStreamState = () => {
+  const resetStreamState = (shouldClearMessages = true) => {
     typingQueueRef.current = "";
     displayedTextRef.current = "";
     typingPromiseRef.current = null;
     currentAssistantMessageIdRef.current = null;
     setIsStreaming(false);
     abortControllerRef.current = null;
-    setStreamingChatId(null);
     setStreamingMessageId(null);
-    clearStreamingMessages();
+    if (shouldClearMessages) {
+      setStreamingChatId(null);
+      clearStreamingMessages();
+    }
+  };
+
+  const savePartialMessage = async () => {
+    if (!streamContextRef.current || !displayedTextRef.current) return;
+
+    try {
+      const { chatId, userId, message } = streamContextRef.current;
+      await api.post("/chat/partial/save", {
+        chatId,
+        userId,
+        message: displayedTextRef.current,
+        userMessage: message,
+      });
+    } catch (error) {
+      console.error("Failed to save partial message:", error);
+    }
   };
 
   const abortStream = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      resetStreamState();
+      // Keep streaming messages visible, just clear typing indicators
+      resetStreamState(false);
     }
   };
 
@@ -133,6 +157,9 @@ export const useStreamingChat = ({
     model,
   }: StreamRequest) => {
     const baseUrl = api.defaults.baseURL || "";
+
+    // Store context for partial message saving
+    streamContextRef.current = { chatId, userId, message };
 
     currentAssistantMessageIdRef.current = assistantTempId;
     setStreamingMessageId(assistantTempId);
@@ -191,6 +218,10 @@ export const useStreamingChat = ({
           const chat = event.chat as ApiChatDetails;
           setActiveChatId(chat._id);
           setMessages(mapApiChatMessages(chat));
+          // Transition from streaming messages to regular messages
+          setStreamingChatId(null);
+          setStreamingMessageId(null);
+          clearStreamingMessages();
           // upsertChat(mapApiChatSummary(chat));
           //  console.log("Stream formatted data:", mapApiChatSummary(chat));
 
@@ -213,12 +244,25 @@ export const useStreamingChat = ({
     } catch (error) {
       // Don't show error message if the request was aborted
       if (error instanceof DOMException && error.name === "AbortError") {
-        // User clicked stop - keep the partial message that was already displayed
+        // User clicked stop - save the partial message that was already displayed
+        await savePartialMessage();
         return;
       }
       updateStreamingMessageContent(assistantTempId, STREAM_ERROR_MESSAGE);
     } finally {
-      resetStreamState();
+      // Only fully reset if we didn't abort (error or normal completion with full reset handled in event)
+      if (abortControllerRef.current?.signal.aborted) {
+        // Abort was called - keep messages visible
+        resetStreamState(false);
+      } else {
+        // For errors, keep the streaming UI visible but stop animation
+        typingQueueRef.current = "";
+        displayedTextRef.current = "";
+        typingPromiseRef.current = null;
+        currentAssistantMessageIdRef.current = null;
+        setIsStreaming(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 

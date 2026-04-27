@@ -119,7 +119,7 @@ const ChatArea = () => {
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages, streamingMessages, loading]);
 
   // 🔹 Auto resize textarea
   useEffect(() => {
@@ -176,7 +176,13 @@ const ChatArea = () => {
   };
 
   // Determine which messages to display
-  const displayMessages = streamingChatId === activeChatId ? streamingMessages : messages;
+  // Show streaming messages if:
+  // 1. We're streaming in the current chat, OR
+  // 2. We're creating a new chat (activeChatId is null but streamingChatId is set)
+  const displayMessages = 
+    streamingChatId === activeChatId || (activeChatId === null && streamingChatId !== null)
+      ? streamingMessages 
+      : messages;
 
   return (
     <div className="flex flex-col h-full w-full bg-linear-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">

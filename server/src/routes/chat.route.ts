@@ -2,7 +2,7 @@ import { Router } from "express";
 
 
 
-import { createNewChat, deleteChat, getAvailableModels, getIndividualChatDetails, getUserChats, streamChatResponse, updatePrevChat } from "../controllers/chat.controller";
+import { createNewChat, deleteChat, getAvailableModels, getIndividualChatDetails, getUserChats, streamChatResponse, updatePrevChat, savePartialMessage } from "../controllers/chat.controller";
 
 const router = Router();
 
@@ -13,6 +13,8 @@ router.post("/", createNewChat);
 router.get("/models", getAvailableModels);
 
 router.post("/stream", streamChatResponse);
+
+router.post("/partial/save", savePartialMessage);
 
 router.post("/:id/messages", updatePrevChat);
 
