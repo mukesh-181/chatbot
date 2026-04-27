@@ -42,11 +42,13 @@ export const useStreamingChat = ({
   setSelectedModel,
 }: UseStreamingChatParams) => {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const typingQueueRef = useRef("");
   const displayedTextRef = useRef("");
   const typingPromiseRef = useRef<Promise<void> | null>(null);
   const currentAssistantMessageIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const flushTypingQueue = async () => {
     if (typingPromiseRef.current) {
@@ -73,6 +75,15 @@ export const useStreamingChat = ({
     typingPromiseRef.current = null;
     currentAssistantMessageIdRef.current = null;
     setStreamingMessageId(null);
+    setIsStreaming(false);
+    abortControllerRef.current = null;
+  };
+
+  const abortStream = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      resetStreamState();
+    }
   };
 
   const startTypingDrain = () => {
@@ -116,8 +127,12 @@ export const useStreamingChat = ({
 
     currentAssistantMessageIdRef.current = assistantTempId;
     setStreamingMessageId(assistantTempId);
+    setIsStreaming(true);
     typingQueueRef.current = "";
     displayedTextRef.current = "";
+
+    // Create a new AbortController for this stream
+    abortControllerRef.current = new AbortController();
 
     try {
       const response = await fetch(`${baseUrl}/chat/stream`, {
@@ -132,6 +147,7 @@ export const useStreamingChat = ({
           provider,
           model,
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       await consumeSSEStream(response, async (event) => {
@@ -174,7 +190,12 @@ export const useStreamingChat = ({
           updateMessageContent(assistantTempId, displayedTextRef.current);
         }
       });
-    } catch {
+    } catch (error) {
+      // Don't show error message if the request was aborted
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // User clicked stop - keep the partial message that was already displayed
+        return;
+      }
       updateMessageContent(assistantTempId, STREAM_ERROR_MESSAGE);
     } finally {
       resetStreamState();
@@ -183,6 +204,8 @@ export const useStreamingChat = ({
 
   return {
     streamingMessageId,
+    isStreaming,
     startStream,
+    abortStream,
   };
 };

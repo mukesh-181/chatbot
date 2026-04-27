@@ -36,7 +36,7 @@ const ChatArea = () => {
 
   const { availableModels, selectedModel, setSelectedModel } = useModels();
 
-  const { streamingMessageId, startStream } = useStreamingChat({
+  const { streamingMessageId, isStreaming, startStream, abortStream } = useStreamingChat({
     updateMessageContent,
     setMessages,
     setActiveChatId,
@@ -196,9 +196,11 @@ const ChatArea = () => {
           <InputComponents
             input={input}
             loading={loading}
+            isStreaming={isStreaming}
             textareaRef={textareaRef}
             onInputChange={setInput}
             onSend={handleSendMessage}
+            onStop={abortStream}
           />
         </div>
       </div>
